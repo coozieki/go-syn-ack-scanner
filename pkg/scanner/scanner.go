@@ -41,8 +41,13 @@ func (connector NetPackageConnector) Connect(ip string, port int) bool {
 	if connector.Network != "" {
 		network = connector.Network
 	}
-	_, error := net.DialTimeout(network, address, timeout)
-	return error == nil
+	connect, error := net.DialTimeout(network, address, timeout)
+	if error == nil {
+		connect.Close()
+		return true
+	}
+
+	return false
 }
 
 func NewScanner(params ScannerParams) scanner {
