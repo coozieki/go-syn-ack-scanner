@@ -23,5 +23,8 @@ func main() {
 	openedPorts := scanner.Scan(os.Args[1])
 	fmt.Println("--------------------------------------------------------------")
 	fmt.Println("Открытые порты: ", openedPorts)
-	fmt.Println("Продолжительность сканирования: ", time.Since(start).Seconds(), "сек")
+	fmt.Println("--------------------------------------------------------------")
+	fmt.Printf("Продолжительность сканирования: %.2f сек", time.Since(start).Seconds())
+	fmt.Println()
+	fmt.Println("--------------------------------------------------------------")
 }

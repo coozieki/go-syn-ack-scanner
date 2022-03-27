@@ -3,6 +3,7 @@ package scanner
 import (
 	"fmt"
 	"net"
+	"os"
 	"time"
 )
 
@@ -84,15 +85,19 @@ func (s *scanner) Scan(ip string) []int {
 		go s.runCheckPortsWorker(ip)
 	}
 	countPortsChecked := 0
-	var scannedPort, openedPort int
+	var openedPort int
 	for {
 		if countPortsChecked == MAX_PORT_NUMBER {
 			s.closeChannels()
+			fmt.Fprint(os.Stdout, "\r \r")
 			break
 		}
 		select {
-		case scannedPort = <-s.checkedPortChannel:
-			fmt.Println("Отсканирован порт: ", scannedPort)
+		case <-s.checkedPortChannel:
+			if countPortsChecked%500 == 0 {
+				fmt.Fprint(os.Stdout, "\r \r")
+				fmt.Printf("Прогресс сканирования: %.2f%%", float64(countPortsChecked)/float64(MAX_PORT_NUMBER)*100)
+			}
 			countPortsChecked++
 			if countPortsChecked+s.maxThreads > MAX_PORT_NUMBER {
 				continue
