@@ -43,7 +43,7 @@ func (connector NetPackageConnector) Connect(ip string, port int) bool {
 	}
 	connect, error := net.DialTimeout(network, address, timeout)
 	if error == nil {
-		connect.Close()
+		defer connect.Close()
 		return true
 	}
 
