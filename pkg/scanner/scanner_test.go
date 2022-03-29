@@ -2,23 +2,43 @@ package scanner_test
 
 import (
 	"go-syn-ack-scanner/pkg/scanner"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
+var checkedPorts []uint
+var countLoggerCalls uint
+var mu sync.Mutex
+
 type connectorMock struct {
-	openedPort1 int
-	openedPort2 int
+	openPorts []uint
 }
 
-func (c connectorMock) Connect(ip string, port int) bool {
-	return c.openedPort1 == port || c.openedPort2 == port
+func (c connectorMock) Connect(ip string, port uint) bool {
+	mu.Lock()
+	checkedPorts = append(checkedPorts, port)
+	mu.Unlock()
+	for _, openPort := range c.openPorts {
+		if openPort == port {
+			return true
+		}
+	}
+	return false
 }
 
-func TestNewScannerWithRightParams(t *testing.T) {
+type loggerMock struct{}
+
+func (l loggerMock) Log(message string) {
+	mu.Lock()
+	countLoggerCalls++
+	mu.Unlock()
+}
+
+func TestNewScanner(t *testing.T) {
 	t.Run("all params", func(t *testing.T) {
-		maxThreads := 7
+		var maxThreads uint = 7
 		scanner.NewScanner(scanner.ScannerParams{Connector: connectorMock{}, MaxThreads: maxThreads})
 	})
 
@@ -28,25 +48,39 @@ func TestNewScannerWithRightParams(t *testing.T) {
 }
 
 func TestScan(t *testing.T) {
-	t.Run("with opened ports", func(t *testing.T) {
-		openedPort1 := 1
-		openedPort2 := scanner.MAX_PORT_NUMBER
+	t.Run("with open ports", func(t *testing.T) {
+		checkedPorts = []uint{}
+		countLoggerCalls = 0
+
+		openPorts := []uint{1, scanner.MAX_PORT_NUMBER}
+
 		s := scanner.NewScanner(
 			scanner.ScannerParams{
-				Connector: connectorMock{openedPort1: openedPort1, openedPort2: openedPort2},
+				Connector: connectorMock{openPorts: openPorts},
+				Logger:    loggerMock{},
 			},
 		)
 
-		assert.Equal(t, []int{openedPort1, openedPort2}, s.Scan("ip"))
+		assert.Equal(t, openPorts, s.Scan("ip"))
+		assert.Equal(t, scanner.MAX_PORT_NUMBER, countLoggerCalls)
+		assert.Equal(t, scanner.MAX_PORT_NUMBER, uint(len(checkedPorts)))
 	})
 
-	t.Run("without opened port", func(t *testing.T) {
+	t.Run("without open port", func(t *testing.T) {
+		checkedPorts = []uint{}
+		countLoggerCalls = 0
+
+		openPorts := []uint{}
+
 		s := scanner.NewScanner(
 			scanner.ScannerParams{
-				Connector: connectorMock{},
+				Connector: connectorMock{openPorts: openPorts},
+				Logger:    loggerMock{},
 			},
 		)
 
-		assert.Equal(t, []int(nil), s.Scan("ip"))
+		assert.Equal(t, openPorts, s.Scan("ip"))
+		assert.Equal(t, scanner.MAX_PORT_NUMBER, countLoggerCalls)
+		assert.Equal(t, scanner.MAX_PORT_NUMBER, uint(len(checkedPorts)))
 	})
 }

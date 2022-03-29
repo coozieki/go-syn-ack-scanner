@@ -16,8 +16,7 @@ func main() {
 	}
 	scanner := scanner.NewScanner(
 		scanner.ScannerParams{
-			Connector:  scanner.NetPackageConnector{Timeout: time.Millisecond * 300, Network: "tcp"},
-			MaxThreads: maxThreads,
+			MaxThreads: uint(maxThreads),
 		},
 	)
 	openedPorts := scanner.Scan(os.Args[1])

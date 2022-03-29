@@ -3,28 +3,14 @@ package scanner
 import (
 	"fmt"
 	"net"
-	"os"
 	"time"
 )
 
-const MAX_PORT_NUMBER int = 65536
-const DEFAULT_MAX_THREADS int = 8
+const MAX_PORT_NUMBER uint = 65535
+const DEFAULT_MAX_THREADS uint = 8
 
-type MakesConnection interface {
-	Connect(ip string, port int) bool
-}
-
-type scanner struct {
-	connector          MakesConnection
-	checkedPortChannel chan int
-	openPortChannel    chan int
-	portToCheckChannel chan int
-	maxThreads         int
-}
-
-type ScannerParams struct {
-	Connector  MakesConnection
-	MaxThreads int
+type Connector interface {
+	Connect(ip string, port uint) bool
 }
 
 type NetPackageConnector struct {
@@ -32,7 +18,7 @@ type NetPackageConnector struct {
 	Network string
 }
 
-func (connector NetPackageConnector) Connect(ip string, port int) bool {
+func (connector NetPackageConnector) Connect(ip string, port uint) bool {
 	timeout := time.Second
 	network := "tcp"
 	address := fmt.Sprintf("%s:%d", ip, port)
@@ -51,9 +37,37 @@ func (connector NetPackageConnector) Connect(ip string, port int) bool {
 	return false
 }
 
+type Logger interface {
+	Log(message string)
+}
+
+type ConsoleLogger struct{}
+
+func (cl ConsoleLogger) Log(message string) {
+	fmt.Println(message)
+}
+
+type scanner struct {
+	connector          Connector
+	logger             Logger
+	checkedPortChannel chan uint
+	openPortChannel    chan uint
+	portToCheckChannel chan uint
+	maxThreads         uint
+}
+
+type ScannerParams struct {
+	Connector  Connector
+	MaxThreads uint
+	Logger     Logger
+}
+
 func NewScanner(params ScannerParams) scanner {
-	var connector MakesConnection
+	var connector Connector
+	var logger Logger
+
 	connector = NetPackageConnector{}
+	logger = ConsoleLogger{}
 	maxThreads := DEFAULT_MAX_THREADS
 
 	if params.MaxThreads != 0 {
@@ -62,13 +76,17 @@ func NewScanner(params ScannerParams) scanner {
 	if params.Connector != nil {
 		connector = params.Connector
 	}
+	if params.Logger != nil {
+		logger = params.Logger
+	}
 
-	portChannel := make(chan int, 1)
-	openPortChannel := make(chan int, 1)
-	portToCheckChannel := make(chan int, maxThreads)
+	portChannel := make(chan uint, 1)
+	openPortChannel := make(chan uint, 1)
+	portToCheckChannel := make(chan uint, maxThreads)
 
 	return scanner{
 		connector:          connector,
+		logger:             logger,
 		checkedPortChannel: portChannel,
 		openPortChannel:    openPortChannel,
 		maxThreads:         maxThreads,
@@ -76,34 +94,29 @@ func NewScanner(params ScannerParams) scanner {
 	}
 }
 
-func (s *scanner) Scan(ip string) []int {
-	var res []int
-	for i := 1; i <= s.maxThreads; i++ {
+func (s *scanner) Scan(ip string) []uint {
+	res := []uint{}
+	for i := uint(1); i <= s.maxThreads; i++ {
 		s.portToCheckChannel <- i
 	}
-	for i := 0; i < s.maxThreads; i++ {
+	for i := uint(0); i < s.maxThreads; i++ {
 		go s.runCheckPortsWorker(ip)
 	}
-	countPortsChecked := 0
-	var openedPort int
+	var countPortsChecked uint = 0
 	for {
 		if countPortsChecked == MAX_PORT_NUMBER {
 			s.closeChannels()
-			fmt.Fprint(os.Stdout, "\r \r")
 			break
 		}
 		select {
-		case <-s.checkedPortChannel:
-			if countPortsChecked%500 == 0 {
-				fmt.Fprint(os.Stdout, "\r \r")
-				fmt.Printf("Прогресс сканирования: %.2f%%", float64(countPortsChecked)/float64(MAX_PORT_NUMBER)*100)
-			}
+		case checkedPort := <-s.checkedPortChannel:
+			s.logger.Log(fmt.Sprintf("Отсканирован порт: %d", checkedPort))
 			countPortsChecked++
 			if countPortsChecked+s.maxThreads > MAX_PORT_NUMBER {
 				continue
 			}
 			s.portToCheckChannel <- countPortsChecked + s.maxThreads
-		case openedPort = <-s.openPortChannel:
+		case openedPort := <-s.openPortChannel:
 			res = append(res, openedPort)
 		}
 	}
