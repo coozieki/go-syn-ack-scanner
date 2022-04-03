@@ -25,12 +25,12 @@ func (connector NetPackageConnector) Connect(ip string, port uint) bool {
 	if connector.Timeout != 0 {
 		timeout = connector.Timeout
 	}
-	if connector.Network != "" {
+	if connector.Network != "" { // TODO: Такая инверсия не позволяет проверить поведение данного условия в тестах
 		network = connector.Network
 	}
-	connect, error := net.DialTimeout(network, address, timeout)
+	connect, error := net.DialTimeout(network, address, timeout) // TODO: Тут нет инверссии и интерфейсов, поэтому, ты не смог это написать по TDD
 	if error == nil {
-		defer connect.Close()
+		defer connect.Close() // TODO: Это основная ветвь программы, я бы инвертировал проверку
 		return true
 	}
 
@@ -41,7 +41,7 @@ type Logger interface {
 	Log(message string)
 }
 
-type ConsoleLogger struct{}
+type ConsoleLogger struct{} // TODO: Это адаптер
 
 func (cl ConsoleLogger) Log(message string) {
 	fmt.Println(message)
@@ -62,8 +62,8 @@ type ScannerParams struct {
 	Logger     Logger
 }
 
-func NewScanner(params ScannerParams) scanner {
-	var connector Connector
+func NewScanner(params ScannerParams) scanner { // TODO: Exported function with the unexported return type
+	var connector Connector // TODO: Жесткая связь, будет мешать инверсии зависимостей
 	var logger Logger
 
 	connector = NetPackageConnector{}
@@ -73,7 +73,7 @@ func NewScanner(params ScannerParams) scanner {
 	if params.MaxThreads != 0 {
 		maxThreads = params.MaxThreads
 	}
-	if params.Connector != nil {
+	if params.Connector != nil { // TODO: Тоже плохая форма инверсии, не позволяет проверить поведение программы полностью
 		connector = params.Connector
 	}
 	if params.Logger != nil {
@@ -97,7 +97,7 @@ func NewScanner(params ScannerParams) scanner {
 func (s *scanner) Scan(ip string) []uint {
 	res := []uint{}
 	for i := uint(1); i <= s.maxThreads; i++ {
-		s.portToCheckChannel <- i
+		s.portToCheckChannel <- i // TODO: Нарушение DRY, ниже еще набиваем его портами, лучше было выделить в отдельный поток
 	}
 	for i := uint(0); i < s.maxThreads; i++ {
 		go s.runCheckPortsWorker(ip)
@@ -112,12 +112,12 @@ func (s *scanner) Scan(ip string) []uint {
 		case checkedPort := <-s.checkedPortChannel:
 			s.logger.Log(fmt.Sprintf("Отсканирован порт: %d", checkedPort))
 			countPortsChecked++
-			if countPortsChecked+s.maxThreads > MAX_PORT_NUMBER {
+			if countPortsChecked+s.maxThreads > MAX_PORT_NUMBER { // TODO: Сложно понять эту проверку, но я справился
 				continue
 			}
-			s.portToCheckChannel <- countPortsChecked + s.maxThreads
+			s.portToCheckChannel <- countPortsChecked + s.maxThreads // TODO: Тут тоже сложновато, через меняц будет сложно понять, почему мы их складываем
 		case openedPort := <-s.openPortChannel:
-			res = append(res, openedPort)
+			res = append(res, openedPort) // TODO: Только поедаем память, могли возвращать данные через канал, не занимая столько памяти
 		}
 	}
 	return res

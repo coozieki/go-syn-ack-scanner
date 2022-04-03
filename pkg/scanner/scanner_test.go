@@ -40,17 +40,20 @@ func TestNewScanner(t *testing.T) {
 	t.Run("all params", func(t *testing.T) {
 		var maxThreads uint = 7
 		scanner.NewScanner(scanner.ScannerParams{Connector: connectorMock{}, MaxThreads: maxThreads})
+		// TODO: по факту ничего не проверяется, только контракты, никак не гарантирует сборку сканера
 	})
 
 	t.Run("no params", func(t *testing.T) {
 		scanner.NewScanner(scanner.ScannerParams{})
+		// TODO: по факту ничего не проверяется, только контракты, никак не гарантирует сборку сканера
 	})
 }
 
 func TestScan(t *testing.T) {
 	t.Run("with open ports", func(t *testing.T) {
 		checkedPorts = []uint{}
-		countLoggerCalls = 0
+		countLoggerCalls = 0 // TODO: Связь через глобальную переменную, такие вещи приводят к невозможности предсказать поведение
+		// TODO: Количество вызывов логера, никак не гарантирует информативность текста, туда могут писать пустые строки
 
 		openPorts := []uint{1, scanner.MAX_PORT_NUMBER}
 
